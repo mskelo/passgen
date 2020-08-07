@@ -12,7 +12,7 @@ generate () {
         done
         echo "Copy any of the generated passwords above and press 'q' to automatically delete this file." >> $file
         less $file;
-        rm $file
+        shred -u $file
     else
         echo "--------------------------\n
             Can't do that.\n
