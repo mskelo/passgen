@@ -1,0 +1,37 @@
+#!/bin/zsh
+
+if ! command -v gshred &> /dev/null
+then
+    echo "\"gshred\" could not be found! \nInstall coreutils by entering \"brew install coreutils\""
+    exit
+fi
+
+file=$(mktemp)
+
+generate () {
+    if (( $1 > 0 && $1 <= 25 )) && (( $2 > 0 && $2 <= 50 )); then
+        touch $file; 
+        for i in {1..$2}
+        do
+            head /dev/urandom | LC_CTYPE=C tr -dc A-Za-z0-9 | head -c $2 >> $file; 
+            echo "" >> $file;
+        done
+        echo "Copy any of the generated passwords above and press 'q' to automatically delete this file." >> $file
+        less $file;
+        gshred -u $file
+    else
+        echo "--------------------------\n
+            Can't do that.\n
+            Two arguments must be given: 
+            \t (\$1) amount of passwords to generate (1 < x < 25)
+            \t (\$2) length of generated strings (1 < x < 50)\n"
+    fi
+}
+
+if [[ $# -eq 0 ]] then
+    generate 20 20
+elif ! [[ $1 =~ ^[0-9]+$ || $2 =~ ^[0-9]+$ ]] then
+    echo "Sorry, integers only"
+else
+    generate $1 $2
+fi
