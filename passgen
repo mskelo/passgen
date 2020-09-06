@@ -1,36 +1,69 @@
 #!/bin/bash
-shopt -s extglob
+# 99TODO: 
+#   -h (help) 
+#   -L(length)
+#   hardcode amount of generated passwords
+#   -uldp (charsets)
 
 if ! find /usr/local/bin/ -name "*shred" &> /dev/null ;
 then
-    printf "\"(g)shred\" could not be found! \n Please install \"coreutils\" via your package manager."
+    printf "This program needs \"shred\" to work.\nPlease install \"coreutils\" via your package manager.\n"
     exit
 fi
 
+uppercase=false;
+lowercase=false;
+digits=false;
+punctuation=false;
+length=0;
+errormsg="\nCan't do that.\nTwo integer arguments must be given:\n\t (\$1) amount of passwords to generate (1 <= x <= 25)\n\t (\$2) length of generated strings (1 <= x <= 100)\nWhen no arguments are given, both will default to 20.\n\n"
+
 generate () {
-    if (( $1 > 0 && $1 <= 25 )) && (( $2 > 0 && $2 <= 50 )); then
+    if (( $1 > 0 && $1 <= 50 )); then
         file=$(mktemp)
-        for i in $(seq 1 $2);
+        for i in $(seq 1 20);
         do
-            head /dev/urandom | LC_CTYPE=C tr -dc A-Za-z0-9 | head -c $2 >> $file
-            echo "" >> $file
+            head /dev/urandom | LC_CTYPE=C tr -dc A-Za-z0-9 | head -c $1 >> $file
+            echo \n >> $file
         done
-        echo "Copy any of the generated passwords above and press 'q' to automatically delete this file." >> $file
+        printf "\nCopy any of the generated passwords above and press 'q' to automatically delete this file." >> $file
         less $file;
         shred -u $file
     else
-        echo "--------------------------\n
-            Can't do that.\n
-            Two arguments must be given: 
-            \t (\$1) amount of passwords to generate (1 < x < 25)
-            \t (\$2) length of generated strings (1 < x < 50)\n"
+        printf "$errormsg"
     fi
 }
-
-if [[ $# -eq 0 ]]; then
-    generate 20 20
-elif ! [[ $1 =~ ^[0-9]+$ || $2 =~ ^[0-9]+$ ]]; then
-    echo "Sorry, integers only"
+if [ $# -eq 0 ]; then
+    generate 20;
 else
-    generate $1 $2
+    while [ ! $# -eq 0 ]
+    do
+        case "$1" in
+            --help | -h)
+                echo "help"
+                exit
+                ;;
+            --uppercase | -u)
+                uppercase=true
+                ;;
+            --lowercase | -l)
+                lowercase=true
+                ;;
+            --digits | -d)
+                digits=true
+                ;;
+            --punctuation | -p)
+                punctuation=true
+                ;;
+            --length | -L)
+                length=$2
+                ;;
+        esac
+        shift
+    done
+    generate $length
 fi
+
+
+#elif ! [[ $1 =~ ^[0-9]+$ || $2 =~ ^[0-9]+$ ]]; then
+#    printf $errormsg
