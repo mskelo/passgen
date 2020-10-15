@@ -1,69 +1,137 @@
 #!/bin/bash
-# 99TODO: 
-#   -h (help) 
-#   -L(length)
-#   hardcode amount of generated passwords
-#   -uldp (charsets)
+#TODO: Check if errors make sense
 
+#Try to find shred or gshred before continuing
 if ! find /usr/local/bin/ -name "*shred" &> /dev/null ;
 then
     printf "This program needs \"shred\" to work.\nPlease install \"coreutils\" via your package manager.\n"
     exit
 fi
 
-uppercase=false;
-lowercase=false;
-digits=false;
-punctuation=false;
-length=0;
-errormsg="\nCan't do that.\nTwo integer arguments must be given:\n\t (\$1) amount of passwords to generate (1 <= x <= 25)\n\t (\$2) length of generated strings (1 <= x <= 100)\nWhen no arguments are given, both will default to 20.\n\n"
+#Global vars and constants
+charset="";
+u='A-Z';
+l='a-z';
+d='0-9';
+p="!@#$%^&*-_=+";
+passwordlength=20;
+should_generate=true;
+re='^[0-9]+$';
 
+#Error messages
+lengtherrormsg="Password length must be between 10 and 50. Default is 20.\n"
+ordererrormsg="Couldn't understand input. Did you enter everything in the right order? \nUsage:\n\tpassgen\n\tpassgen [length]\n\tpassgen [options] [length]\n"
+generalinputerrormsg="Couldn't understand input. Run passgen -h for help.\n"
+floaterrormsg="Couldn't parse input. Only integer numbers are allowed.\n"
+
+
+#Checks if user input for $passwordlength is float instead of float. If so: error. 
+#Creates a tempfile and fills it with 20 pseudorandomly generated passwords of $passwordlength consisting of given charset.
+#Tempfile is automatically shredded upon exit. See: man (g|)shred
 generate () {
-    if (( $1 > 0 && $1 <= 50 )); then
+    echo "$passwordlength"
+    if [[ $passwordlength -ge 10 && $passwordlength -le 50 ]]; then
+        password="";
         file=$(mktemp)
         for i in $(seq 1 20);
         do
-            head /dev/urandom | LC_CTYPE=C tr -dc A-Za-z0-9 | head -c $1 >> $file
-            echo \n >> $file
+            head /dev/urandom | tr -dc "$charset" | head -c $passwordlength >> $file
+            echo '' >> $file
         done
+        password="";
         printf "\nCopy any of the generated passwords above and press 'q' to automatically delete this file." >> $file
         less $file;
         shred -u $file
     else
-        printf "$errormsg"
+        printf "$lengtherrormsg" 2>&1
+        exit;
     fi
 }
-if [ $# -eq 0 ]; then
-    generate 20;
-else
-    while [ ! $# -eq 0 ]
-    do
-        case "$1" in
-            --help | -h)
-                echo "help"
-                exit
-                ;;
-            --uppercase | -u)
-                uppercase=true
-                ;;
-            --lowercase | -l)
-                lowercase=true
-                ;;
-            --digits | -d)
-                digits=true
-                ;;
-            --punctuation | -p)
-                punctuation=true
-                ;;
-            --length | -L)
-                length=$2
-                ;;
+
+#Parses flags. If ! h, compile total charset and generate passwords. 
+parseopts_and_generate() {
+    while getopts ":uldph" opt; do
+        case ${opt} in
+            u ) charset="$charset$u";
+            ;;
+            l ) charset="$charset$l";
+            ;;
+            d ) charset="$charset$d";
+            ;;
+            p ) charset="$charset$p";
+            ;;
+            h ) 
+                should_generate=false; 
+                help;
+            ;;
         esac
-        shift
     done
-    generate $length
+    if $should_generate; then
+        generate;
+    fi
+}
+
+#Print program description and usage
+help() {
+    echo "
+Randomly (/dev/urandom) generates a list of 20 passwords in a temporary file that is opened in less, and is automatically shredded upon exit.
+    
+Usage:
+    passgen
+    passgen [options]
+    passgen [length]
+    passgen [options] [length]
+
+Options:
+    -u: Add uppercase characters to pool of characters to choose from.
+    -l: Add lowercase characters to pool of characters to choose from.
+    -d: Add numbers to pool of characters to choose from.
+    -p: Add special characters to pool of characters to choose from.
+    -h: Print help.
+
+Only integers can be entered for password length.    
+When no options are selected, the program automatically executes with -uld 20.";
+}
+
+#If no arguments are provided: use defaults
+if [ $# -eq 0 ]; then
+    charset=$u$l$d;
+    generate;
+#If one argument is provided:
+elif [ $# -eq 1 ]; then
+    #First argument is integer: set default charset (uld) and generate passwords with length $1
+    if [[ $1 =~ $re ]]; then
+        charset=$u$l$d;
+        passwordlength=$1;
+        generate;
+    else
+        #First argument is float: produce error message.
+        if [[ $passwordlength =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then
+            printf "$floaterrormsg" 2>&1
+            exit;
+        #First argument contains flags: parse flags and generate passwords with default length
+        else
+            parseopts_and_generate $@;
+        fi
+    fi
+#If two arguments are provided:
+elif [ $# -eq 2 ]; then
+    #Second argument is integer: valid input
+    if [[ $2 =~ $re ]]; then
+        passwordlength=$2;
+        parseopts_and_generate $@;
+    #Second argument is float or string
+    elif [[ $2 =~ ^[+-]?[0-9]+\.?[0-9]*$ ]]; then #add string check
+        printf "$floaterrormsg" 2>&1
+        exit;
+    #Input likely in wrong order
+    else
+        printf "$ordererrormsg" 2>&1
+        exit;
+    fi
+#If more arguments are provided: error.
+else
+    printf "$generalinputerrormsg" 2>&1
+    exit;
 fi
 
-
-#elif ! [[ $1 =~ ^[0-9]+$ || $2 =~ ^[0-9]+$ ]]; then
-#    printf $errormsg
